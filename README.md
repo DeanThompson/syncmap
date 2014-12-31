@@ -15,7 +15,7 @@ go get github.com/DeanThompson/syncmap
 
 Example:
 
-```golang
+```go
 import (
     "fmt"
 
