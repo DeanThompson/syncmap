@@ -1,7 +1,6 @@
 package syncmap
 
 import (
-	"encoding/json"
 	"sort"
 	"strconv"
 	"testing"
@@ -138,19 +137,5 @@ func Test_IterKeys(t *testing.T) {
 		if v != expectedKeys[i] {
 			t.Error("IterKeys doesn't loop over the right keys")
 		}
-	}
-}
-
-func Test_MarshalJSON(t *testing.T) {
-	m := New()
-	m.Set("one", 1)
-	m.Set("two", 2)
-	data, err := json.Marshal(m)
-	if err != nil {
-		t.Error(err)
-	}
-	expected := `{"one":1,"two":2}`
-	if string(data) != expected {
-		t.Error("MarshalJSON returns wrong answer")
 	}
 }

@@ -1,29 +1,36 @@
+// A thread safe map implementation for Golang
 package syncmap
 
-import (
-	"encoding/json"
-	"sync"
-)
+import "sync"
 
 const (
 	defaultShardCount uint8 = 32
 )
 
+// syncMap wraps built-in map by using RWMutex for concurrent safe.
 type syncMap struct {
 	items map[string]interface{}
 	sync.RWMutex
 }
 
+// SyncMap keeps a slice of *syncMap with length of `shardCount`.
+// Using a slice of syncMap instead of a large one is to avoid lock bottlenecks.
 type SyncMap struct {
 	shardCount uint8
 	shards     []*syncMap
 }
 
+// Create a new SyncMap with default shard count.
 func New() *SyncMap {
 	return NewWithShard(defaultShardCount)
 }
 
+// Create a new SyncMap with given shard count.
+// NOTE: shard count must be power of 2, default shard count will be used otherwise.
 func NewWithShard(shardCount uint8) *SyncMap {
+	if !isPowerOfTwo(shardCount) {
+		shardCount = defaultShardCount
+	}
 	m := new(SyncMap)
 	m.shardCount = shardCount
 	m.shards = make([]*syncMap, m.shardCount)
@@ -33,10 +40,12 @@ func NewWithShard(shardCount uint8) *SyncMap {
 	return m
 }
 
+// Find the specific shard with the given key
 func (m *SyncMap) locate(key string) *syncMap {
-	return m.shards[BkdrHash(key)&uint32((m.shardCount-1))]
+	return m.shards[bkdrHash(key)&uint32((m.shardCount-1))]
 }
 
+// Retrieves a value
 func (m *SyncMap) Get(key string) (value interface{}, ok bool) {
 	shard := m.locate(key)
 	shard.RLock()
@@ -46,6 +55,7 @@ func (m *SyncMap) Get(key string) (value interface{}, ok bool) {
 	return
 }
 
+// Sets value with the given key
 func (m *SyncMap) Set(key string, value interface{}) {
 	shard := m.locate(key)
 	shard.Lock()
@@ -53,6 +63,7 @@ func (m *SyncMap) Set(key string, value interface{}) {
 	shard.items[key] = value
 }
 
+// Removes an item
 func (m *SyncMap) Delete(key string) {
 	shard := m.locate(key)
 	shard.Lock()
@@ -60,11 +71,13 @@ func (m *SyncMap) Delete(key string) {
 	delete(shard.items, key)
 }
 
+// Whether SyncMap has the given key
 func (m *SyncMap) Has(key string) bool {
 	_, ok := m.Get(key)
 	return ok
 }
 
+// Returns the number of items
 func (m *SyncMap) Size() int {
 	size := 0
 	for _, shard := range m.shards {
@@ -75,6 +88,7 @@ func (m *SyncMap) Size() int {
 	return size
 }
 
+// Wipes all items from the map
 func (m *SyncMap) Flush() int {
 	size := 0
 	for _, shard := range m.shards {
@@ -86,6 +100,7 @@ func (m *SyncMap) Flush() int {
 	return size
 }
 
+// Returns a channel from which each key in the map can be read
 func (m *SyncMap) IterKeys() <-chan string {
 	ch := make(chan string)
 	go func() {
@@ -101,11 +116,13 @@ func (m *SyncMap) IterKeys() <-chan string {
 	return ch
 }
 
+// Item is a pair of key and value
 type Item struct {
 	Key   string
 	Value interface{}
 }
 
+// Return a channel from which each item (key:value pair) in the map can be read
 func (m *SyncMap) IterItems() <-chan Item {
 	ch := make(chan Item)
 	go func() {
@@ -121,10 +138,18 @@ func (m *SyncMap) IterItems() <-chan Item {
 	return ch
 }
 
-func (m SyncMap) MarshalJSON() ([]byte, error) {
-	x := make(map[string]interface{})
-	for item := range m.IterItems() {
-		x[item.Key] = item.Value
+const seed uint32 = 131	// 31 131 1313 13131 131313 etc..
+
+func bkdrHash(str string) uint32 {
+	var h uint32
+
+	for _, c := range str {
+		h = h*seed + uint32(c)
 	}
-	return json.Marshal(x)
+
+	return h
+}
+
+func isPowerOfTwo(x uint8) bool {
+	return x != 0 && (x & (x-1) == 0)
 }
