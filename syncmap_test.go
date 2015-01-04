@@ -139,3 +139,19 @@ func Test_IterKeys(t *testing.T) {
 		}
 	}
 }
+
+func Test_Pop(t *testing.T) {
+	m := New()
+	m.Pop()
+
+	m.Set("one", 1)
+
+	k, v := m.Pop()
+	if k != "one" && v.(int) != 1 {
+		t.Error("Pop should returns the only item")
+	}
+	if m.Size() != 0 {
+		t.Error("Size should be 0 after pop the only item")
+	}
+
+}

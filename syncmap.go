@@ -1,7 +1,11 @@
 // A thread safe map implementation for Golang
 package syncmap
 
-import "sync"
+import (
+	"math/rand"
+	"sync"
+	"time"
+)
 
 const (
 	defaultShardCount uint8 = 32
@@ -49,9 +53,8 @@ func (m *SyncMap) locate(key string) *syncMap {
 func (m *SyncMap) Get(key string) (value interface{}, ok bool) {
 	shard := m.locate(key)
 	shard.RLock()
-	defer shard.RUnlock()
-
 	value, ok = shard.items[key]
+	shard.RUnlock()
 	return
 }
 
@@ -59,16 +62,50 @@ func (m *SyncMap) Get(key string) (value interface{}, ok bool) {
 func (m *SyncMap) Set(key string, value interface{}) {
 	shard := m.locate(key)
 	shard.Lock()
-	defer shard.Unlock()
 	shard.items[key] = value
+	shard.Unlock()
 }
 
 // Removes an item
 func (m *SyncMap) Delete(key string) {
 	shard := m.locate(key)
 	shard.Lock()
-	defer shard.Unlock()
 	delete(shard.items, key)
+	shard.Unlock()
+}
+
+// Pop delete and return a random item in the cache
+func (m *SyncMap) Pop() (string, interface{}) {
+	if m.Size() == 0 {
+		panic("syncmap: map is empty")
+	}
+
+	var (
+		key   string
+		value interface{}
+		found = false
+		n     = int(m.shardCount)
+	)
+
+	for {
+		idx := rand.Intn(n)
+		shard := m.shards[idx]
+		shard.Lock()
+		if len(shard.items) > 0 {
+			found = true
+			for k, v := range shard.items {
+				key, value = k, v
+				break
+			}
+			delete(shard.items, key)
+		}
+		shard.Unlock()
+		if found {
+			break
+		}
+	}
+
+	return key, value
 }
 
 // Whether SyncMap has the given key
@@ -138,7 +175,7 @@ func (m *SyncMap) IterItems() <-chan Item {
 	return ch
 }
 
-const seed uint32 = 131	// 31 131 1313 13131 131313 etc..
+const seed uint32 = 131 // 31 131 1313 13131 131313 etc..
 
 func bkdrHash(str string) uint32 {
 	var h uint32
@@ -151,5 +188,9 @@ func bkdrHash(str string) uint32 {
 }
 
 func isPowerOfTwo(x uint8) bool {
-	return x != 0 && (x & (x-1) == 0)
+	return x != 0 && (x&(x-1) == 0)
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }
