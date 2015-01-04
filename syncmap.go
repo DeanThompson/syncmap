@@ -87,22 +87,18 @@ func (m *SyncMap) Pop() (string, interface{}) {
 		n     = int(m.shardCount)
 	)
 
-	for {
+	for !found {
 		idx := rand.Intn(n)
 		shard := m.shards[idx]
 		shard.Lock()
 		if len(shard.items) > 0 {
 			found = true
-			for k, v := range shard.items {
-				key, value = k, v
+			for key, value = range shard.items {
 				break
 			}
 			delete(shard.items, key)
 		}
 		shard.Unlock()
-		if found {
-			break
-		}
 	}
 
 	return key, value
