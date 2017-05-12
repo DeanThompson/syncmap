@@ -5,11 +5,14 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"errors"
 )
 
 const (
 	defaultShardCount uint8 = 32
 )
+
+var ErrorStop = errors.New("stop")
 
 // syncMap wraps built-in map by using RWMutex for concurrent safe.
 type syncMap struct {
@@ -133,17 +136,38 @@ func (m *SyncMap) Flush() int {
 	return size
 }
 
+// IterKeyFun is is the type of the function called for each key.
+//
+// If an error is returned,each key stops.
+// Don't modify the SyncMap in this function,
+// or maybe leads to deadlock.
+type IterKeyFun func(key string) error
+
+func (m *SyncMap)ForEachKey(iter IterKeyFun)  {
+	bStop := false
+	for _, shard := range m.shards {
+		shard.RLock()
+		for key, _ := range shard.items {
+			if nil != iter(key){
+				bStop = true
+				break
+			}
+		}
+		shard.RUnlock()
+		if bStop {
+			break
+		}
+	}
+}
+
 // Returns a channel from which each key in the map can be read
 func (m *SyncMap) IterKeys() <-chan string {
 	ch := make(chan string)
 	go func() {
-		for _, shard := range m.shards {
-			shard.RLock()
-			for key, _ := range shard.items {
-				ch <- key
-			}
-			shard.RUnlock()
-		}
+		m.ForEachKey(func(key string) error {
+			ch <- key
+			return nil
+		})
 		close(ch)
 	}()
 	return ch
@@ -155,17 +179,39 @@ type Item struct {
 	Value interface{}
 }
 
+// IterItemFun is is the type of the function called for each item.
+//
+// If an error is returned,each item stops.
+// Don't modify the SyncMap in this function,
+// or maybe leads to deadlock.
+type IterItemFun func(item *Item) error
+
+func (m *SyncMap)ForEachItem(iter IterItemFun)  {
+	bStop := false
+	for _, shard := range m.shards {
+		shard.RLock()
+		for key, value := range shard.items {
+			if nil != iter(&Item{key, value})  {
+				bStop = true
+				break
+			}
+		}
+		shard.RUnlock()
+		if bStop {
+			break
+		}
+	}
+
+}
+
 // Return a channel from which each item (key:value pair) in the map can be read
 func (m *SyncMap) IterItems() <-chan Item {
 	ch := make(chan Item)
 	go func() {
-		for _, shard := range m.shards {
-			shard.RLock()
-			for key, value := range shard.items {
-				ch <- Item{key, value}
-			}
-			shard.RUnlock()
-		}
+		m.ForEachItem(func(item *Item) error {
+			ch <- *item
+			return nil
+		})
 		close(ch)
 	}()
 	return ch
