@@ -154,3 +154,40 @@ func Test_Pop(t *testing.T) {
 		t.Error("Size should be 0 after pop the only item")
 	}
 }
+
+func Test_ForEachItem(t *testing.T)  {
+	m := New()
+	for i := 0; i < 42; i++ {
+		m.Set(strconv.Itoa(i), i)
+	}
+	var i *Item
+	m.ForEachItem(func(item *Item) error {
+		i = item
+		return ErrorStop
+	})
+	m.Set(i.Key,"new")
+	if v, ok := m.Get(i.Key); !ok || v.(string) != "new" {
+		t.Error("value should be an string of value new")
+	}
+
+}
+
+func Test_ForEachKey(t *testing.T) {
+	m := New()
+	for i := 0; i < 42; i++ {
+		m.Set(strconv.Itoa(i), i)
+	}
+	var k string
+	m.ForEachKey(func(key string) error {
+		k = key
+		return ErrorStop
+	})
+	m.Delete(k)
+	v1, ok := m.Get(k)
+	if ok {
+		t.Error("ok should be false when key is missing")
+	}
+	if v1 != nil {
+		t.Error("value should be nil for missing key")
+	}
+}
