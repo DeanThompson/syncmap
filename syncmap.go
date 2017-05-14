@@ -5,14 +5,11 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-	"errors"
 )
 
 const (
 	defaultShardCount uint8 = 32
 )
-
-var ErrorStop = errors.New("stop")
 
 // syncMap wraps built-in map by using RWMutex for concurrent safe.
 type syncMap struct {
@@ -136,19 +133,19 @@ func (m *SyncMap) Flush() int {
 	return size
 }
 
-// IterKeyFun is is the type of the function called for each key.
+// IterKeyFun is the type of the function called for each key.
 //
-// If an error is returned,each key stops.
+// If false is returned,each key stops.
 // Don't modify the SyncMap in this function,
 // or maybe leads to deadlock.
-type IterKeyFun func(key string) error
+type IterKeyFun func(key string) bool
 
-func (m *SyncMap)ForEachKey(iter IterKeyFun)  {
+func (m *SyncMap) ForEachKey(iter IterKeyFun) {
 	bStop := false
 	for _, shard := range m.shards {
 		shard.RLock()
 		for key, _ := range shard.items {
-			if nil != iter(key){
+			if !iter(key) {
 				bStop = true
 				break
 			}
@@ -160,13 +157,26 @@ func (m *SyncMap)ForEachKey(iter IterKeyFun)  {
 	}
 }
 
+// IterEveryKeyFun is the type of the function called for every key.
+//
+// Don't modify the SyncMap in this function,
+// or maybe leads to deadlock.
+type IterEveryKeyFun func(key string)
+
+func (m *SyncMap) IterEveryKey(iter IterEveryKeyFun) {
+	f := func(key string) bool {
+		iter(key)
+		return true
+	}
+	m.ForEachKey(f)
+}
+
 // Returns a channel from which each key in the map can be read
 func (m *SyncMap) IterKeys() <-chan string {
 	ch := make(chan string)
 	go func() {
-		m.ForEachKey(func(key string) error {
+		m.IterEveryKey(func(key string) {
 			ch <- key
-			return nil
 		})
 		close(ch)
 	}()
@@ -179,19 +189,19 @@ type Item struct {
 	Value interface{}
 }
 
-// IterItemFun is is the type of the function called for each item.
+// IterItemFun is the type of the function called for each item.
 //
-// If an error is returned,each item stops.
+// If false is returned,each item stops.
 // Don't modify the SyncMap in this function,
 // or maybe leads to deadlock.
-type IterItemFun func(item *Item) error
+type IterItemFun func(item *Item) bool
 
-func (m *SyncMap)ForEachItem(iter IterItemFun)  {
+func (m *SyncMap) ForEachItem(iter IterItemFun) {
 	bStop := false
 	for _, shard := range m.shards {
 		shard.RLock()
 		for key, value := range shard.items {
-			if nil != iter(&Item{key, value})  {
+			if !iter(&Item{key, value}) {
 				bStop = true
 				break
 			}
@@ -204,13 +214,26 @@ func (m *SyncMap)ForEachItem(iter IterItemFun)  {
 
 }
 
+// IterEveryItemFun is the type of the function called for every item.
+//
+// Don't modify the SyncMap in this function,
+// or maybe leads to deadlock.
+type IterEveryItemFun func(item *Item)
+
+func (m *SyncMap) IterEveryItem(iter IterEveryItemFun) {
+	f := func(item *Item) bool {
+		iter(item)
+		return true
+	}
+	m.ForEachItem(f)
+}
+
 // Return a channel from which each item (key:value pair) in the map can be read
 func (m *SyncMap) IterItems() <-chan Item {
 	ch := make(chan Item)
 	go func() {
-		m.ForEachItem(func(item *Item) error {
+		m.IterEveryItem(func(item *Item) {
 			ch <- *item
-			return nil
 		})
 		close(ch)
 	}()
