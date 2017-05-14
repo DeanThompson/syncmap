@@ -155,17 +155,17 @@ func Test_Pop(t *testing.T) {
 	}
 }
 
-func Test_ForEachItem(t *testing.T)  {
+func Test_ForEachItem(t *testing.T) {
 	m := New()
 	for i := 0; i < 42; i++ {
 		m.Set(strconv.Itoa(i), i)
 	}
 	var i *Item
-	m.ForEachItem(func(item *Item) error {
+	m.ForEachItem(func(item *Item) bool {
 		i = item
-		return ErrorStop
+		return false
 	})
-	m.Set(i.Key,"new")
+	m.Set(i.Key, "new")
 	if v, ok := m.Get(i.Key); !ok || v.(string) != "new" {
 		t.Error("value should be an string of value new")
 	}
@@ -178,9 +178,9 @@ func Test_ForEachKey(t *testing.T) {
 		m.Set(strconv.Itoa(i), i)
 	}
 	var k string
-	m.ForEachKey(func(key string) error {
+	m.ForEachKey(func(key string) bool {
 		k = key
-		return ErrorStop
+		return false
 	})
 	m.Delete(k)
 	v1, ok := m.Get(k)
