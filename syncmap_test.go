@@ -155,13 +155,13 @@ func Test_Pop(t *testing.T) {
 	}
 }
 
-func Test_ForEachItem(t *testing.T) {
+func Test_EachItem(t *testing.T) {
 	m := New()
 	for i := 0; i < 42; i++ {
 		m.Set(strconv.Itoa(i), i)
 	}
 	var i *Item
-	m.ForEachItem(func(item *Item) bool {
+	m.EachItemWithBreak(func(item *Item) bool {
 		i = item
 		return false
 	})
@@ -172,13 +172,13 @@ func Test_ForEachItem(t *testing.T) {
 
 }
 
-func Test_ForEachKey(t *testing.T) {
+func Test_EachKey(t *testing.T) {
 	m := New()
 	for i := 0; i < 42; i++ {
 		m.Set(strconv.Itoa(i), i)
 	}
 	var k string
-	m.ForEachKey(func(key string) bool {
+	m.EachKeyWithBreak(func(key string) bool {
 		k = key
 		return false
 	})
