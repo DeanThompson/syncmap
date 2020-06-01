@@ -1,7 +1,10 @@
-syncmap
+DEPRECATED syncmap
 =======
 
 [![GoDoc](https://godoc.org/github.com/DeanThompson/syncmap?status.svg)](https://godoc.org/github.com/DeanThompson/syncmap) [![Build Status](https://travis-ci.org/DeanThompson/syncmap.svg?branch=master)](https://travis-ci.org/DeanThompson/syncmap)
+
+
+**THIS PACKAGE IS DEPRECATED, PLEASE USE THE [sync.Map](https://golang.org/pkg/sync/#Map) PROVIDED BY GO STANDARD LIBRARY.**
 
 A thread safe map implementation for Golang
 
